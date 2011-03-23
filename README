@@ -1,0 +1,5 @@
+// Javascript 3D Rendering framework for using mobile devices to use three.js
+// Overloads keypress and touch events to navigate through 3D space and add/view
+// Three.js objects onto multiple renderers.
+//
+// See index.html for more details
