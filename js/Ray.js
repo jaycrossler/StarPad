@@ -11,15 +11,17 @@ THREE.Ray = function ( origin, direction ) {
 
 THREE.Ray.prototype = {
 
-	intersectScene : function ( scene ) {
+	intersectScene : function ( scene, checkClickable ) {
 
-		var i, l, object,
+		var i, l, j, k, object,
 		objects = scene.objects,
 		intersects = [];
 
 		for ( i = 0, l = objects.length; i < l; i++ ) {
 
 			object = objects[i];
+
+			if (checkClickable && !object.isClickable) continue;
 
 			if ( object instanceof THREE.Mesh ) {
 
@@ -33,10 +35,50 @@ THREE.Ray.prototype = {
 
 			}
 
+			if ( object instanceof THREE.ParticleSystem ) {
+			
+				intersects = intersects.concat( this.intersectParticleSystemItem( object ) );				
+				
+			}
 		}
 
 		intersects.sort( function ( a, b ) { return a.distance - b.distance; } );
 
+		return intersects;
+
+	},
+
+	intersectParticleSystemItem : function ( object ) {
+		var intersects = [], target_point, starter_vector;
+
+		var origin_point = this.origin.clone();
+		var direction_vector = this.direction.clone();
+
+		for ( var i = 0, l = object.geometry.vertices.length; i < l; i++) {
+			target_point = object.geometry.vertices[i].position; 
+			starter_vector = target_point.clone().subSelf(origin_point);
+		
+			var c1 = starter_vector.dot ( direction_vector );
+			var c2 = direction_vector.dot ( direction_vector );
+			var b = c1 / c2;
+			var intersect_point = origin_point.clone().addSelf(direction_vector.multiplyScalar(b));
+
+			var dist = target_point.distanceTo(intersect_point);
+			
+			//There are two ways people make particles - with one material, or many
+			var dist_cutoff = (object.materials[i]) ? (object.materials[i].size/2) : (object.materials[0].size/2);
+
+			if (dist < dist_cutoff) {
+				var intersect = {
+					distance: dist,
+					point: target_point,
+					particleNumber: i,
+					object: object.geometry.vertices[i],
+					particleSystem: object
+				};
+				intersects.push( intersect );
+			}
+		}
 		return intersects;
 
 	},
@@ -80,11 +122,11 @@ THREE.Ray.prototype = {
 		var intersect_point = origin_point.clone().addSelf(direction_vector.multiplyScalar(b));
 
 		var dist = target_point.distanceTo(intersect_point);
-//if (dist <4) console.log(dist);
-		if (dist < 1) {
+		var dist_cutoff = (object.scale && object.scale.x) ? (object.scale.x/2) : 1;  //Scale works on straight Particles
+		if (dist < dist_cutoff) {
 			var intersect = {
 				distance: dist,
-				point: intersect_point,
+				point: target_point,
 				face: null,
 				object: object
 			};

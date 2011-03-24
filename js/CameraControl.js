@@ -1,5 +1,6 @@
 /**
  * @author mrdoob / http://mrdoob.com/
+ * @author jaycrossler / http://wecreategames.com
  * @author alteredq / http://alteredqualia.com/
  * @author paulirish / http://paulirish.com/
  */
@@ -56,32 +57,17 @@ CameraControlWASD = function ( camera, movement_speed, look_speed, nofly, look_v
 		projector.unprojectVector( vector, camera );
 		var ray = new THREE.Ray( camera.position, vector.subSelf( camera.position ).normalize() );
 
-		var intersects = ray.intersectScene( scene );
-		var objClicked = null;
-		if ( intersects.length > 0 ) { //Test to make sure the clicked item is clickable
-			for ( var i=0, l = intersects.length; i < l; i++ ) {
-				objClicked = intersects[ i ].object;
-				if (objClicked && objClicked.isClickable) break; //We found a valid clickable object
-			}
-		}
-		return (objClicked && objClicked.isClickable) ? objClicked : null;
+		var intersects = ray.intersectScene( scene, true );
+
+		return (intersects[ 0 ]) ? intersects[ 0 ] : null;
 	}
-var lastClicked = null, lastColor = null;
 	this.onDocumentMouseDown = function ( event ) {
 		event.preventDefault();
 		
-		var objectClicked = this.objectAtScreenXY(event.clientX,event.clientY);
+		var intersectClicked = this.objectAtScreenXY(event.clientX,event.clientY);
 		
-		if (objectClicked) {  //Check if it's a number of a planet
-			//planetWasClicked(planetid);
-			div_info.innerHTML='Clicked: '+objectClicked.name;
-			if (lastClicked) {
-				lastClicked.materials[0] = new THREE.ParticleCircleMaterial( { color: lastColor });
-			}
-			lastClicked = objectClicked;
-			lastColor = objectClicked.materials[0].color.hex;
-			
-			objectClicked.materials[0] = new THREE.ParticleCircleMaterial( { color: 0xff0000 });
+		if (intersectClicked) { 
+			objectWasClicked(intersectClicked);
 		} else {
 			div_info.innerHTML='';
 			//Object not clicked, handle move instead
@@ -215,7 +201,7 @@ var lastClicked = null, lastColor = null;
 	}
 	this.update = function() {
 		if ( this.moveForward ) {
-			if (this.dist() > (3 *this.movement_speed)) {
+			if (this.dist() > (2 *this.movement_speed)) {
 				this.move('rot_forward', this.movement_speed, 'FORWARD '+this.movement_speed);
 			}
 		}
@@ -223,7 +209,7 @@ var lastClicked = null, lastColor = null;
 				this.move('rot_back', this.movement_speed, 'BACKWARD '+this.movement_speed);
 		}
 		if ( this.moveUp ) {
-			if (this.dist() > (3 *this.movement_speed)) {
+			if (this.dist() > (2 *this.movement_speed)) {
 				this.move('move_up', this.movement_speed, 'UP '+this.movement_speed);
 			}
 		}
@@ -316,11 +302,8 @@ var lastClicked = null, lastColor = null;
 			first = touches[0],
 			numtouches = touches.length;
 
-		var objectClicked = this.objectAtScreenXY(e.changedTouches[0].pageX,e.changedTouches[0].pageY);
-		if (objectClicked) { 
-			//planetWasClicked(planetid);
-			div_info.innerHTML='Selected: '+objectClicked.name;
-		}
+		var intersectClicked = this.objectAtScreenXY(e.changedTouches[0].pageX,e.changedTouches[0].pageY);
+		if (intersectClicked) objectWasClicked(intersectClicked);
 
 		if (numtouches == 1) {
 			var moved = 0, touch = e.changedTouches[0];
@@ -340,7 +323,7 @@ var lastClicked = null, lastColor = null;
 //		div_info.innerHTML='time:'+this.touchState.duration+' moved:' + Math.round(moved) +' x:'+this.touchState.x+' y:'+this.touchState.y+'<br/>';
 //		if (numtouches > 1) div_info.innerHTML+=' TWO<br/>';
 	
-		if ((this.touchState.duration < 1200) && (moved > 30)) {
+		if ((this.touchState.duration < 1200) && (moved > 30)) {  //TODO: Remove duration?
 			//It's some sort of finger swipe
 
 			if (Math.abs(this.touchState.y) < 50) {

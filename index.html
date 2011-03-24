@@ -111,7 +111,7 @@
 				init_renderer();
 				init_stats();
 				
-				init_object_points(100,true);
+				init_object_points(24,true);
 			}
 			//=======================================
 			function init_object_points(show_amount, isRedder) {
@@ -129,24 +129,28 @@
 					}
 
 					//Staring sun // TODO, Add a seperate sphere?
-					var geometry = new THREE.Geometry();
-					var vector = new THREE.Vector3( 0,0,0 );
-					geometry.vertices.push( new THREE.Vertex( vector ) );
-					geometry.colors[ 0 ] = new THREE.Color( 0xfff2a1 - color_offset );
-					
+ 					var geometry = new THREE.Geometry();
+// 					var vector = new THREE.Vertex( new THREE.Vector3( 0,0,0 ));
+// 					vector.name = "Sol: The Sun";
+// 					geometry.vertices.push( vector );
+// 					geometry.colors[ 0 ] = new THREE.Color( 0xfff2a1 - color_offset );
+// 					
 					//Stars
-					for ( var i = 1; i <= show_amount; i ++ ) {
+					for ( var i = 0; i <= show_amount; i ++ ) {
 						if (i >= star_init_list.length) break; 
 						var obj = star_init_list[i];
-						vector = new THREE.Vector3( obj.galX, obj.galY, obj.galZ );
-						geometry.vertices.push( new THREE.Vertex( vector ) );
+						vector = new THREE.Vertex(new THREE.Vector3( obj.galX, obj.galY, obj.galZ ));
+						vector.name = obj.starName;
+						geometry.vertices.push( vector );
 						geometry.colors[ i ] = new THREE.Color( obj.color - color_offset );
 					}
+					//TODO: Scale based on size
 					var sprite = ImageUtils.loadTexture( "textures/sprites/circle.png" );
-					var material = new THREE.ParticleBasicMaterial( { size: 1, map: sprite, blending: THREE.BillboardBlending, vertexColors: true } );
+					var material = new THREE.ParticleBasicMaterial( { size: 3, map: sprite, blending: THREE.AdditiveBlending, vertexColors: true } );
 	
 					particles = new THREE.ParticleSystem( geometry, material );
 					particles.sortParticles = true;
+					particles.isClickable = true;
 					particles.updateMatrix();
 					scene.addObject( particles );
 					
@@ -167,7 +171,7 @@
 					particle.position.z = 0;
 					particle.scale.x = particle.scale.y = 3;
 					particle.isClickable = true;
-					particle.name = "Star: Sol";
+					particle.name = "Sol";
 					scene.addObject( particle );
 					particles.push( particle );
 
@@ -180,7 +184,7 @@
 						particle.position = new THREE.Vector3( obj.galX, obj.galY, obj.galZ );
 						particle.scale.x = particle.scale.y = 0.4;
 						particle.isClickable = true;
-						particle.name = "Star: "+obj.starName;
+						particle.name = obj.starName;
 						scene.addObject( particle );				
 						particles.push( particle );
 					}
@@ -190,6 +194,60 @@
 				is_rendered = true;
 				
 			}
+//TODO: Clean up these variables
+var lastClicked = null, lastColor = null, highlightLine = null;
+			function objectWasClicked(intersectClicked) {
+				var starscopy = [];
+				var objectClicked = intersectClicked.object;
+
+				div_info.innerHTML=objectClicked.name;
+				if (option_RenderEngine == "webgl") {
+					if (lastClicked) {
+						intersectClicked.particleSystem.geometry.colors[lastClicked] = new THREE.Color( lastColor );
+						scene.removeObject(highlightLine);
+					}
+					lastClicked = intersectClicked.particleNumber; 
+					lastColor = intersectClicked.particleSystem.geometry.colors[intersectClicked.particleNumber].hex;
+					intersectClicked.particleSystem.geometry.colors[intersectClicked.particleNumber].setHex( 0xff0000 );
+
+					starscopy = intersectClicked.particleSystem.geometry.vertices.concat([]); //copy the sorted array
+
+				} else { // Canvas.  TODO: Make it work for SVG
+					if (lastClicked) {
+						lastClicked.materials[0] = new THREE.ParticleCircleMaterial( { color: lastColor });
+						scene.removeObject(highlightLine);
+					}
+					lastClicked = objectClicked;
+					lastColor = objectClicked.materials[0].color.hex;				
+					objectClicked.materials[0] = new THREE.ParticleCircleMaterial( { color: 0xff0000 });
+
+					for (var j = 0, k = scene.objects.length; j<k; j++) {
+						var scobj = scene.objects[j];
+						if (scobj.isClickable && scobj instanceof THREE.Particle) 
+							starscopy = starscopy.concat(scobj);
+					}
+
+				}
+
+				var closest = starscopy.sort( function ( a, b ) { return objectClicked.position.distanceTo (a.position)-objectClicked.position.distanceTo (b.position); } );
+				div_info.innerHTML+="<br/>Closest Stars: 1)"+closest[1].name + ' 2)' +closest[2].name + ' 3)'+closest[3].name + ' 4)'+closest[4].name;
+		
+				var geometry = new THREE.Geometry();  //TODO: Not count system binaries
+				geometry.vertices.push( new THREE.Vertex( closest[0].position ) );
+				geometry.vertices.push( new THREE.Vertex( closest[1].position ) );
+				geometry.vertices.push( new THREE.Vertex( closest[0].position ) );
+				geometry.vertices.push( new THREE.Vertex( closest[2].position ) );
+				geometry.vertices.push( new THREE.Vertex( closest[0].position ) );
+				geometry.vertices.push( new THREE.Vertex( closest[3].position ) );
+				geometry.vertices.push( new THREE.Vertex( closest[0].position ) );
+				geometry.vertices.push( new THREE.Vertex( closest[4].position ) );
+				var material = new THREE.LineBasicMaterial( { color: 0xff0000, opacity: 0.8 } );
+				highlightLine = new THREE.Line( geometry, material );
+				scene.addObject( highlightLine );
+
+			
+			}
+			
 			function init_object_cube() {
 				//Set up any objects that should be shown on the scene
 				var materials = [];
