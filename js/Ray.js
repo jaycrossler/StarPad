@@ -1,5 +1,6 @@
 /**
  * @author mr.doob / http://mrdoob.com/
+ * @author jaycrossler / http://wecreategames.com
  */
 
 THREE.Ray = function ( origin, direction ) {
@@ -67,8 +68,9 @@ THREE.Ray.prototype = {
 			
 			//There are two ways people make particles - with one material, or many
 			var dist_cutoff = (object.materials[i]) ? (object.materials[i].size/2) : (object.materials[0].size/2);
+			var dist_padding = 1;
 
-			if (dist < dist_cutoff) {
+			if (dist < (dist_cutoff+dist_padding)) {
 				var intersect = {
 					distance: dist,
 					point: target_point,
@@ -123,7 +125,8 @@ THREE.Ray.prototype = {
 
 		var dist = target_point.distanceTo(intersect_point);
 		var dist_cutoff = (object.scale && object.scale.x) ? (object.scale.x/2) : 1;  //Scale works on straight Particles
-		if (dist < dist_cutoff) {
+		var dist_padding = 1;
+		if (dist < (dist_cutoff+dist_padding)) {
 			var intersect = {
 				distance: dist,
 				point: target_point,

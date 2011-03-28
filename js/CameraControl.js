@@ -323,7 +323,7 @@ CameraControlWASD = function ( camera, movement_speed, look_speed, nofly, look_v
 //		div_info.innerHTML='time:'+this.touchState.duration+' moved:' + Math.round(moved) +' x:'+this.touchState.x+' y:'+this.touchState.y+'<br/>';
 //		if (numtouches > 1) div_info.innerHTML+=' TWO<br/>';
 	
-		if ((this.touchState.duration < 1200) && (moved > 30)) {  //TODO: Remove duration?
+		if (moved > 20) {  
 			//It's some sort of finger swipe
 
 			if (Math.abs(this.touchState.y) < 50) {

@@ -34,7 +34,7 @@
 			
 			#details {
 				position: absolute;
-				width: 120px; height: 110px;
+				width: 120px; height: 70px;
 				color: #ffffff;
 				background-color: #200;
 				padding: 3px;
@@ -43,7 +43,30 @@
 				filter: alpha(opacity=50);
 				opacity: 0.7;
 			}
+
+			#infoleft {
+				position: absolute;
+				color: #ffffff;
+				background-color: #200;
+				padding: 3px;
+				left: 10px; bottom: 10px;
+				opacity: 0.7;
+			}
 			
+			.infotabtitle {
+				color: white;
+				font-weight: bold;
+			}
+
+			.infotab {
+				line-break: strict;
+				font-family: arial;
+				font-size: 10px;
+				color: black;
+				font-weight: bold;
+				padding : 3px;
+			}
+
 			a, span {
 				color: #0000ff;
 				cursor: pointer; cursor: hand;
@@ -66,6 +89,7 @@
 		<script type="text/javascript" src="js/Stats.js"></script>
 		<script type="text/javascript" src="js/Three.js"></script>
 		<script type="text/javascript" src="js/Ray.js"></script>
+		<script type="text/javascript" src="js/Color.js"></script>
 		<script type="text/javascript" src="js/CameraControl.js"></script>
 		<script type="text/javascript" src="js/RequestAnimationFrame.js"></script>
 		<script type="text/javascript" src="stars_build1.js"></script>
@@ -74,18 +98,25 @@
 
 		<div id="container"></div> 
 		<div id="info"></div>
-		<div id="details">
-			100*<span onclick="init_object_points(100,false);">REAL</span>
-			 <span onclick="init_object_points(100,true);">ATMO</span><br/>
-			500*<span onclick="init_object_points(500,false);">REAL</span>
-			 <span onclick="init_object_points(500,true);">ATMO</span><br/>
-			2K**<span onclick="init_object_points(2500,false);">REAL</span>
-			 <span onclick="init_object_points(2500,true);">ATMO</span><br/>
+		<div id="infoleft">
+			<div id="infolefttitle" class="infotabtitle"></div>
+			<div id="infotab1" class="infotab"></div>
+			<div id="infotab2" class="infotab"></div>
+			<div id="infotab3" class="infotab"></div>
+			<div id="infotab4" class="infotab"></div>
+		</div>
 
+		<div id="details">
+			100*<span onclick="init_object_points(100,false,false);">ALL</span>
+			 <span onclick="init_object_points(100,false,true);">NODWARF</span><br/>
+			500*<span onclick="init_object_points(500,false,false);">ALL</span>
+			 <span onclick="init_object_points(500,false,true);">NODWARF</span><br/>
+			2K**<span onclick="init_object_points(3000,false,false);">ALL</span>
+			 <span onclick="init_object_points(3000,false,true);">NODWARF</span><br/>
 
 			<a href="?renderer=webgl">WEBGL</a>
 			<a href="?renderer=canvas">CANVAS</a>
-			<a href="?renderer=svg">SVG</a>
+<!--	Particles not working		<a href="?renderer=svg">SVG</a>  -->
 		</div>
 
 		<script type="text/javascript">
@@ -94,6 +125,16 @@
 			var option_RenderEngine;
 			
 			var is_rendered = false, particles = [];
+			var lastClicked = null, lastColor = null, highlightLine = null;
+
+			var PI2 = Math.PI * 2;
+			var program = function ( context, color ) {
+				context.fillStyle = color.__styleString;
+				context.beginPath();
+				context.arc( 0, 0, 1, 0, PI2, true );
+				context.closePath();
+				context.fill();
+			}
 
 			function preloader() {
 				init(); //Set up the scene and renderer
@@ -111,14 +152,32 @@
 				init_renderer();
 				init_stats();
 				
-				init_object_points(24,true);
+				init_object_points(100,false,true);
 			}
 			//=======================================
-			function init_object_points(show_amount, isRedder) {
+			function generateSunTexture(color, size) {
+				var size = (size) ? parseInt(size*16) : 16;
+				var canvas = document.createElement( 'canvas' );
+				canvas.width = size;
+				canvas.height = size;
+				var col = new THREE.Color(color);
+				
+				var context = canvas.getContext( '2d' );
+				var gradient = context.createRadialGradient( canvas.width / 2, canvas.height / 2, 0, canvas.width / 2, canvas.height / 2, canvas.width / 2 );
+				gradient.addColorStop( 0, col.rgbaString);
+				gradient.addColorStop( 0.1, col.rgbaString);
+				gradient.addColorStop( 0.6, 'rgba(125, 20, 0, 0.2)' );
+				gradient.addColorStop( .8, 'rgba(255,0,0,0.05)' );
+				gradient.addColorStop( 1, 'rgba(0,0,0,0)' );
+				context.fillStyle = gradient;
+				context.fillRect( 0, 0, canvas.width, canvas.height );
+				return canvas;
+
+			}
+			function init_object_points(show_amount, isRedder, isHideDwarfs) {
 
 				if (!show_amount) show_amount = star_init_list.length;
 				var color_offset = (isRedder) ? 0x006050 : 0x000000;
-
 
 				//currently, the particles are rendered differently
 				if (option_RenderEngine == "webgl") {
@@ -134,20 +193,24 @@
 // 					vector.name = "Sol: The Sun";
 // 					geometry.vertices.push( vector );
 // 					geometry.colors[ 0 ] = new THREE.Color( 0xfff2a1 - color_offset );
-// 					
+ 					
 					//Stars
 					for ( var i = 0; i <= show_amount; i ++ ) {
 						if (i >= star_init_list.length) break; 
 						var obj = star_init_list[i];
+						if (isHideDwarfs && (obj.starType.charAt(0) == "M")) continue; //Hide M-type stars
 						vector = new THREE.Vertex(new THREE.Vector3( obj.galX, obj.galY, obj.galZ ));
 						vector.name = obj.starName;
+						vector.starid = i;
+						vector.color = (obj.color - color_offset);
+
 						geometry.vertices.push( vector );
-						geometry.colors[ i ] = new THREE.Color( obj.color - color_offset );
+						geometry.colors.push( new THREE.Color( obj.color - color_offset ) );
 					}
 					//TODO: Scale based on size
-					var sprite = ImageUtils.loadTexture( "textures/sprites/circle.png" );
-					var material = new THREE.ParticleBasicMaterial( { size: 3, map: sprite, blending: THREE.AdditiveBlending, vertexColors: true } );
-	
+					var sprite = ImageUtils.loadTexture( "textures/sprites/sun2.png" );
+					var material = new THREE.ParticleBasicMaterial( { size: 2, map: sprite, blending: THREE.AdditiveBlending, vertexColors: true } );
+
 					particles = new THREE.ParticleSystem( geometry, material );
 					particles.sortParticles = true;
 					particles.isClickable = true;
@@ -157,33 +220,38 @@
 				} else { //for Canvas and SVG
 					if (is_rendered) {
 						//delete everything
-						for (var l = particles.length, i=l-1; i > 0; i--)
+						for (var l = particles.length, i=l-1; i >= 0; i--)
 							scene.removeObject(particles[i]);
 						is_rendered = false;
 					}
-					particles = [];
+					particles = [];					
 					
 					//Staring sun
-					var material = new THREE.ParticleCircleMaterial( { color: 0xfff2a1 } );
+					var material = new THREE.ParticleBasicMaterial( { map: new THREE.Texture( generateSunTexture(0xfff2a1,4) ), blending: THREE.AdditiveBlending } );
 					var particle = new THREE.Particle( material );
 					particle.position.x = 0;
 					particle.position.y = 0;
 					particle.position.z = 0;
-					particle.scale.x = particle.scale.y = 3;
-					particle.isClickable = true;
+					particle.scale.x = particle.scale.y = .5;
+					particle.isClickable = false;
 					particle.name = "Sol";
+					particle.starid = 0;
 					scene.addObject( particle );
 					particles.push( particle );
 
 					//Stars
 					for ( var i = 0; i < show_amount-1; i ++ ) {
 						if (i >= star_init_list.length) break; 
-						var obj = star_init_list[i];				
-						var material = new THREE.ParticleCircleMaterial( { color: obj.color - color_offset } );
+						var obj = star_init_list[i];
+						if (isHideDwarfs && (obj.starType.charAt(0) == "M")) continue; //Hide M-type stars
+						var material = new THREE.ParticleBasicMaterial( { map: new THREE.Texture( generateSunTexture(obj.color - color_offset,1) ), blending: THREE.AdditiveBlending } );
+
 						var particle = new THREE.Particle( material );
 						particle.position = new THREE.Vector3( obj.galX, obj.galY, obj.galZ );
-						particle.scale.x = particle.scale.y = 0.4;
+						particle.scale.x = particle.scale.y = .1;
 						particle.isClickable = true;
+						particle.color = (obj.color - color_offset);
+						particle.starid = i;
 						particle.name = obj.starName;
 						scene.addObject( particle );				
 						particles.push( particle );
@@ -194,8 +262,6 @@
 				is_rendered = true;
 				
 			}
-//TODO: Clean up these variables
-var lastClicked = null, lastColor = null, highlightLine = null;
 			function objectWasClicked(intersectClicked) {
 				var starscopy = [];
 				var objectClicked = intersectClicked.object;
@@ -212,14 +278,17 @@ var lastClicked = null, lastColor = null, highlightLine = null;
 
 					starscopy = intersectClicked.particleSystem.geometry.vertices.concat([]); //copy the sorted array
 
-				} else { // Canvas.  TODO: Make it work for SVG
+				} else { // Canvas or SVG
+
 					if (lastClicked) {
-						lastClicked.materials[0] = new THREE.ParticleCircleMaterial( { color: lastColor });
+						lastClicked.materials[0] = new THREE.ParticleBasicMaterial( { map: new THREE.Texture( generateSunTexture(lastColor,1) ), blending: THREE.AdditiveBlending } );
+						lastClicked.scale.x = lastClicked.scale.y = .1;
 						scene.removeObject(highlightLine);
 					}
 					lastClicked = objectClicked;
 					lastColor = objectClicked.materials[0].color.hex;				
-					objectClicked.materials[0] = new THREE.ParticleCircleMaterial( { color: 0xff0000 });
+					objectClicked.materials[0] = new THREE.ParticleBasicMaterial( { map: new THREE.Texture( generateSunTexture(0xff0000,1) ), blending: THREE.AdditiveBlending } );
+					objectClicked.scale.x = objectClicked.scale.y = 1;
 
 					for (var j = 0, k = scene.objects.length; j<k; j++) {
 						var scobj = scene.objects[j];
@@ -229,23 +298,57 @@ var lastClicked = null, lastColor = null, highlightLine = null;
 
 				}
 
-				var closest = starscopy.sort( function ( a, b ) { return objectClicked.position.distanceTo (a.position)-objectClicked.position.distanceTo (b.position); } );
-				div_info.innerHTML+="<br/>Closest Stars: 1)"+closest[1].name + ' 2)' +closest[2].name + ' 3)'+closest[3].name + ' 4)'+closest[4].name;
+				var closest_sorted = starscopy.sort( function ( a, b ) { return objectClicked.position.distanceTo (a.position)-objectClicked.position.distanceTo (b.position); } );
+//				div_info.innerHTML+="<br/>Closest Stars: 1)"+closest[1].name + ' 2)' +closest[2].name + ' 3)'+closest[3].name + ' 4)'+closest[4].name;
+
+				var stars_to_show = 4;
+				var closest = [];
+				for (var i = 0; i < (stars_to_show*3); i++) {
+					//remove duplicate stars
+					var star = closest_sorted[i];
+					if (star.name != closest_sorted[i+1].name) {
+						closest.push(closest_sorted[i]);
+					}
+					if (closest.length > stars_to_show) break;
+				}
+				
+				document.getElementById("infolefttitle").innerHTML = "Neighbors:";
 		
 				var geometry = new THREE.Geometry();  //TODO: Not count system binaries
-				geometry.vertices.push( new THREE.Vertex( closest[0].position ) );
-				geometry.vertices.push( new THREE.Vertex( closest[1].position ) );
-				geometry.vertices.push( new THREE.Vertex( closest[0].position ) );
-				geometry.vertices.push( new THREE.Vertex( closest[2].position ) );
-				geometry.vertices.push( new THREE.Vertex( closest[0].position ) );
-				geometry.vertices.push( new THREE.Vertex( closest[3].position ) );
-				geometry.vertices.push( new THREE.Vertex( closest[0].position ) );
-				geometry.vertices.push( new THREE.Vertex( closest[4].position ) );
-				var material = new THREE.LineBasicMaterial( { color: 0xff0000, opacity: 0.8 } );
+				//For the 4 nearest stars
+				for (var i = 1; i <= stars_to_show; i++) {
+					geometry.vertices.push( new THREE.Vertex( closest[0].position ) );
+					geometry.vertices.push( new THREE.Vertex( closest[i].position ) );
+					var star = star_init_list[closest[i].starid];
+
+					var doctab = document.getElementById("infotab"+i);
+// 					doctab.innerHTML = "";
+// 					doctab.setAttribute("width","120px");
+// 					
+// 					var span_name = document.createElement("div");
+// 					span_name.setAttribute("float","left");
+// 					span_name.setAttribute("width","100px");
+// 					doctab.appendChild(span_name);
+// 
+// 					var span_image = document.createElement("div");
+// 					span_image.setAttribute("float","left");
+// 					span_image.setAttribute("width","16px");
+// 					doctab.appendChild(span_image);
+// 					
+
+					var colorstar = new THREE.Color( star.color );
+					doctab.style.backgroundColor = colorstar.rgbaString;
+
+ 					doctab.innerHTML = "<nobr>"+i+": "+star.starName+"</nobr><br/>"
+					doctab.innerHTML+= star.starType+ " "+ 
+						parseInt(closest[0].position.distanceTo(closest[i].position))+ "[" + parseInt(star.dist) + "] LY away";
+//					doctab.appendChild(generateSunTexture(star.color,.8));
+					
+				}
+				var material = new THREE.LineBasicMaterial( { color: 0xff0000, opacity: 0.6 } );
 				highlightLine = new THREE.Line( geometry, material );
 				scene.addObject( highlightLine );
 
-			
 			}
 			
 			function init_object_cube() {
