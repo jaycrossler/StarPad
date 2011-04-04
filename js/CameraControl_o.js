@@ -61,7 +61,6 @@ CameraControlWASD = function ( camera, movement_speed, look_speed, nofly, look_v
 
 		return (intersects[ 0 ]) ? intersects[ 0 ] : null;
 	}
-
 	this.onDocumentMouseDown = function ( event ) {
 		event.preventDefault();
 		
@@ -82,7 +81,6 @@ CameraControlWASD = function ( camera, movement_speed, look_speed, nofly, look_v
 				this.pan_screen_via_mouse = true;
 			}
 		}
-
 	};
 
 	this.onDocumentMouseUp = function ( event ) {
@@ -135,8 +133,7 @@ CameraControlWASD = function ( camera, movement_speed, look_speed, nofly, look_v
 		switch( event.keyCode ) {
 
 			case 38: /*up*/
-			case 87: /*W*/ this.move('rot_forward', this.movement_speed, 'FORWARD '+this.movement_speed);
-				break;
+			case 87: /*W*/ this.moveForward = true; break;
 
 			case 43: /* + */
 			case 187: /* = */ this.moveUp = true; break;
@@ -145,8 +142,7 @@ CameraControlWASD = function ( camera, movement_speed, look_speed, nofly, look_v
 			case 65: /*A*/ this.moveLeft = true; break;
 
 			case 40: /*down*/
-			case 83: /*S*/ this.move('rot_back', this.movement_speed, 'BACKWARD '+this.movement_speed);
-				break;
+			case 83: /*S*/ this.moveBackward = true; break;
 
 			case 45: /* - */
 			case 189: /* _ */ this.moveDown = true; break;
@@ -167,8 +163,8 @@ CameraControlWASD = function ( camera, movement_speed, look_speed, nofly, look_v
 
 		switch( event.keyCode ) {
 
-//			case 38: /*up*/
-//			case 87: /*W*/ this.moveForward = false; break;
+			case 38: /*up*/
+			case 87: /*W*/ this.moveForward = false; break;
 
 			case 43: /* + */
 			case 187: /* = */ this.moveUp = false; break;
@@ -176,8 +172,8 @@ CameraControlWASD = function ( camera, movement_speed, look_speed, nofly, look_v
 			case 37: /*left*/
 			case 65: /*A*/ this.moveLeft = false; break;
 
-//			case 40: /*down*/
-//			case 83: /*S*/ this.moveBackward = false; break;
+			case 40: /*down*/
+			case 83: /*S*/ this.moveBackward = false; break;
 
 			case 45: /* - */
 			case 189: /* _ */ this.moveDown = false; break;
@@ -204,16 +200,18 @@ CameraControlWASD = function ( camera, movement_speed, look_speed, nofly, look_v
 		return distance;	
 	}
 	this.update = function() {
-// 		if ( this.moveForward ) {
-// 			if (this.dist() > (this.movement_speed)) {
-// 				this.move('rot_forward', this.movement_speed, 'FORWARD '+this.movement_speed);
-// 			}
-// 		}
-// 		if ( this.moveBackward ) {
-// 				this.move('rot_back', this.movement_speed, 'BACKWARD '+this.movement_speed);
-// 		}
+		if ( this.moveForward ) {
+			if (this.dist() > (2 *this.movement_speed)) {
+				this.move('rot_forward', this.movement_speed, 'FORWARD '+this.movement_speed);
+			}
+		}
+		if ( this.moveBackward ) {
+				this.move('rot_back', this.movement_speed, 'BACKWARD '+this.movement_speed);
+		}
 		if ( this.moveUp ) {
-			this.move('move_up', this.movement_speed, 'UP '+this.movement_speed);
+			if (this.dist() > (2 *this.movement_speed)) {
+				this.move('move_up', this.movement_speed, 'UP '+this.movement_speed);
+			}
 		}
 		if ( this.moveDown ) {
 				this.move('move_down', this.movement_speed, 'DOWN '+this.movement_speed);
@@ -230,36 +228,39 @@ CameraControlWASD = function ( camera, movement_speed, look_speed, nofly, look_v
 		}
 
 //TODO: Find a better way of doing this:
-		if (this.targetObject && option_RenderEngine == "webgl") this.camera.target=this.targetObject;
+		if (this.targetObject && option_RenderWebGL) this.camera.target=this.targetObject;
 	};
 
 	this.gestureStart = function(e) {
 	//TODO: Turn Gestures on if two finger drags can be adequately captured
 		e.preventDefault ();
-//		div_info.innerHTML='EDIT:  scale:'+e.scale+' rot:' + e.rotation +'<br/>';
+		div_info.innerHTML='EDIT:  scale:'+e.scale+' rot:' + e.rotation +'<br/>';
 		this.touchState.gestureInProgress = true;
 	}
 	this.gestureChange = function(e) {
 		var target = e.target;
 		e.preventDefault ();
 
-//		div_info.innerHTML='CHANGE:  scale:'+e.scale+' rot:' + e.rotation +'<br/>';
-
-
-		if (e.scale > 1.1) {
-			this.move('move_forward', this.movement_speed/2);
-		}
-		if (e.scale < 0.9) {
-			this.move('move_back', this.movement_speed/2);
-		}
+		div_info.innerHTML='CHANGE:  scale:'+e.scale+' rot:' + e.rotation +'<br/>';
+		
 		var rotNew = e.rotation;
 		if (Math.abs(rotNew) > 2) {
 			//There's been a significant change in rotation
 			this.touchState.rotateInProgress = true;
 			if (rotNew < 0) {
-					this.move('rot_right', this.movement_speed/2);
+				this.rotateLeft();
 			} else {
-					this.move('rot_left', this.movement_speed/2);
+				this.rotateRight();
+			}
+		} else {
+			if (!this.touchState.rotateInProgress) {
+				//Check if there's been a scale change
+				if (e.scale > 1.1) {
+					this.scaleUp();
+				}
+				if (e.scale < 0.9) {
+					this.scaleDown();
+				}
 			}
 		}
 	}
@@ -322,11 +323,8 @@ CameraControlWASD = function ( camera, movement_speed, look_speed, nofly, look_v
 //		div_info.innerHTML='time:'+this.touchState.duration+' moved:' + Math.round(moved) +' x:'+this.touchState.x+' y:'+this.touchState.y+'<br/>';
 //		if (numtouches > 1) div_info.innerHTML+=' TWO<br/>';
 	
-		if (moved > 30) {
+		if (moved > 20) {  
 			//It's some sort of finger swipe
-			if (this.touchState.duration > 200) { //A swipe has started
-				this.touchState.gestureInProgress = true;
-			}
 
 			if (Math.abs(this.touchState.y) < 50) {
 				//It's horizontal
@@ -369,9 +367,6 @@ CameraControlWASD = function ( camera, movement_speed, look_speed, nofly, look_v
 
 		var x = e.changedTouches[0].clientX,
 			y = e.changedTouches[0].clientY;
-
-		this.touchState.gestureInProgress = false;
-
 	
 		if (this.touchState.x === x && this.touchState.y === y && this.touchState.touches.length == 1) {
 			//From: http://ross.posterous.com/2008/08/19/iphone-touch-events-in-javascript	
@@ -418,12 +413,12 @@ CameraControlWASD = function ( camera, movement_speed, look_speed, nofly, look_v
 			rz = offsetZ;
 		  	break;
 		}
-//		console.log(axis+":"+ cTarget.x+rx +", "+cTarget.y+ry +", "+cTarget.z+rz );
 		return new THREE.Vector3( cTarget.x+rx, cTarget.y+ry, cTarget.z+rz );
 	}
 
 	this.move = function(type,length,message) {
 		div_info.innerHTML= (message) ? message : "";
+		length = (length>0) ? length : 0;
  		switch(type) {
 		case 'rot_right':	this.camera.position=this.rotateAroundPoint(  length,'y');break;
 		case 'rot_left':	this.camera.position=this.rotateAroundPoint(- length,'y');break;
@@ -431,25 +426,10 @@ CameraControlWASD = function ( camera, movement_speed, look_speed, nofly, look_v
 		case 'rot_back':	this.camera.position=this.rotateAroundPoint(- length,'x');break;
 		case 'rot_up':		this.camera.position=this.rotateAroundPoint(  length,'z');break;
 		case 'rot_down':	this.camera.position=this.rotateAroundPoint(- length,'z');break;
-		case 'move_right':	this.camera.position.x-=length;break;  //TODO: Move perpendicular
+		case 'move_right':	this.camera.position.x-=length;break;
 		case 'move_left':	this.camera.position.x+=length;break;
-		case 'move_forward':
-			var distTo = this.camera.position.distanceTo(this.camera.target.position)
-			if(distTo > (2*length)) {
-				this.camera.position.addSelf(this.camera.target.position.clone().subSelf(this.camera.position).setLength(length));
-			} else { //Very close
-				if (distTo > 5+(this.camera.target.scale.x ? this.camera.target.scale.x : 1)) {
-					this.camera.position.addSelf(this.camera.target.position.clone().subSelf(this.camera.position).setLength(length/10));
-				} else {
-					location.href= "http://wecreategames.com/apps/celestial/";
-				}
-			}
-			break;
-		case 'move_back':
-			if(this.camera.position.distanceTo(this.camera.target.position) < 200) {
-				this.camera.position.subSelf(this.camera.target.position.clone().subSelf(this.camera.position).setLength(length));
-			}
-			break;
+		case 'move_forward':this.camera.position.z-=length;break;
+		case 'move_back':	this.camera.position.z+=length;break;
 		case 'move_up':		this.camera.position.y-=length;break;
 		case 'move_down':	this.camera.position.y+=length;break;
 		}
@@ -480,19 +460,19 @@ CameraControlWASD = function ( camera, movement_speed, look_speed, nofly, look_v
 		this.move('move_down', length, 'SWIPE DOUBLE DOWN '+Math.round(length));
 	}
 	this.rotateLeft = function() {
-//		div_info.innerHTML+='ROTATE LEFT<br/>';
+		div_info.innerHTML+='ROTATE LEFT<br/>';
 		this.camera.position.x+=this.moveDist;
 	}
 	this.rotateRight = function() {
-//		div_info.innerHTML+='ROTATE RIGHT<br/>';
+		div_info.innerHTML+='ROTATE RIGHT<br/>';
 		this.camera.position.x-=this.moveDist;
 	}
 	this.scaleUp = function() {
-//		div_info.innerHTML+='SCALE UP<br/>';
+		div_info.innerHTML+='SCALE UP<br/>';
 		this.camera.position.z+=(this.moveDist*3);		
 	}
 	this.scaleDown = function() {
-//		div_info.innerHTML+='SCALE DOWN<br/>';
+		div_info.innerHTML+='SCALE DOWN<br/>';
 		this.camera.position.z-=(this.moveDist*3);
 	}
 
@@ -534,9 +514,9 @@ CameraControlWASD = function ( camera, movement_speed, look_speed, nofly, look_v
 	document.addEventListener( 'keyup', bind( this, this.onDocumentKeyUp ), false );
 	document.addEventListener( 'DOMMouseScroll', bind( this, this.onDocumentMouseScroll), false);
 	document.addEventListener( 'mousewheel', bind( this, this.onDocumentMouseScroll), false);
-    container.addEventListener( 'gesturestart', bind( this, this.gestureStart), false);
-    container.addEventListener( 'gesturechange', bind( this, this.gestureChange), false);
-    container.addEventListener( 'gestureend', bind( this, this.gestureEnd), false)
+//    container.addEventListener( 'gesturestart', bind( this, this.gestureStart), false);
+//    container.addEventListener( 'gesturechange', bind( this, this.gestureChange), false);
+//    container.addEventListener( 'gestureend', bind( this, this.gestureEnd), false)
 	container.addEventListener( 'touchstart', bind( this, this.touchStart), false);	
 	container.addEventListener( 'touchmove', bind( this, this.touchMove), false);	
 	container.addEventListener( 'touchend', bind( this, this.touchEnd), false);	
